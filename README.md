@@ -4,7 +4,7 @@ Monitoring service which receives rest calls. If no rest call is received for 2 
 ## Getting Started
 
 ### Prerequisites
-* Java 8
+* Java 17
 
 ### Configuration
 Adopt application.properties.
