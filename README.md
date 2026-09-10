@@ -23,10 +23,15 @@ Relevant monitoring settings:
 
 * `monitoring.alert-recipient` - recipient of the alert mails (required)
 * `monitoring.max-services` - upper bound of monitored services, default 100
+* `monitoring.timeout-seconds` - alert after this many seconds without a
+  heartbeat, default 120
 * `monitoring.known-services` - optional comma separated allow list; if set,
   heartbeats for any other name are rejected with HTTP 400
 
 Service names are restricted to `[A-Za-z0-9_.-]`, at most 64 characters.
+
+Keep the `mail.smtp.*` timeouts in place. Without them JavaMail waits forever
+and an unreachable mail server stops the alert scheduler for good.
 
 Authentication is expected to be handled by a reverse proxy in front of the
 service (login + HTTPS). The service itself binds to 127.0.0.1 only and permits

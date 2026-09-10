@@ -1,5 +1,6 @@
 package nrw.andresen.monitoring;
 
+import nrw.andresen.monitoring.services.InvalidHeartbeatException;
 import nrw.andresen.monitoring.services.MonitoringService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -42,12 +43,13 @@ public class MonitoringController {
     }
 
     /**
-     * Abgewiesene Servicenamen werden mit 400 beantwortet. Die Meldungen sind
-     * feste Zeichenketten und enthalten keine Eingabedaten des Aufrufers.
+     * Abgewiesene Heartbeats werden mit 400 beantwortet. Der eigene Ausnahmetyp
+     * stellt sicher, dass hier ausschliesslich die im Service bewusst gesetzten
+     * Meldungen nach aussen gehen und keine Eingabedaten des Aufrufers.
      */
-    @ExceptionHandler(IllegalArgumentException.class)
+    @ExceptionHandler(InvalidHeartbeatException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String invalidRequest(IllegalArgumentException exception) {
+    public String invalidRequest(InvalidHeartbeatException exception) {
         return exception.getMessage();
     }
 }

@@ -5,6 +5,11 @@ spring.mail.username=<email>@gmail.com
 spring.mail.password=<password>
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
+## Ohne Timeouts wartet JavaMail unbegrenzt. Ein haengender Mailserver wuerde
+## sonst den Alarm-Scheduler dauerhaft blockieren.
+spring.mail.properties.mail.smtp.connectiontimeout=5000
+spring.mail.properties.mail.smtp.timeout=5000
+spring.mail.properties.mail.smtp.writetimeout=5000
 
 ## Authentifizierung erfolgt im vorgelagerten Reverse Proxy, siehe SecurityConfig.java.
 ## Der ungenutzte In-Memory-Benutzer wird abgeschaltet, damit beim Start kein
@@ -20,6 +25,8 @@ monitoring.alert-recipient=admin@sonderrechte.de
 ## Obergrenze gleichzeitig ueberwachter Dienste. Verhindert, dass beliebig viele
 ## Namen registriert und dadurch beliebig viele Alarm-Mails ausgeloest werden.
 monitoring.max-services=100
+## Frist in Sekunden, nach der ein ausbleibender Heartbeat einen Alarm ausloest.
+monitoring.timeout-seconds=120
 ## Optionale Positivliste, kommasepariert. Ist sie gesetzt, werden Heartbeats
 ## anderer Namen mit 400 abgewiesen. Leer = jeder gueltige Name bis max-services.
 monitoring.known-services=
