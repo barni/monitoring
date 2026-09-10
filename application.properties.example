@@ -13,3 +13,13 @@ spring.autoconfigure.exclude=org.springframework.boot.security.autoconfigure.Use
 
 ## Listen only on localhost, use reverse proxy for https
 server.address=127.0.0.1
+
+## Monitoring
+## Empfaenger der Alarm-Mails.
+monitoring.alert-recipient=admin@sonderrechte.de
+## Obergrenze gleichzeitig ueberwachter Dienste. Verhindert, dass beliebig viele
+## Namen registriert und dadurch beliebig viele Alarm-Mails ausgeloest werden.
+monitoring.max-services=100
+## Optionale Positivliste, kommasepariert. Ist sie gesetzt, werden Heartbeats
+## anderer Namen mit 400 abgewiesen. Leer = jeder gueltige Name bis max-services.
+monitoring.known-services=

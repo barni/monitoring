@@ -16,20 +16,22 @@
 package nrw.andresen.monitoring;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -56,9 +58,64 @@ public class MonitoringControllerTests {
     @WithMockUser
     public void paramGreetingShouldReturnTailoredMessage() throws Exception {
 
-        this.mockMvc.perform(get("/heartBeat").param("name", "Spring Community"))
+        this.mockMvc.perform(get("/heartBeat").param("name", "SpringCommunity"))
                 .andDo(print()).andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Spring Community"));
+                .andExpect(jsonPath("$.name").value("SpringCommunity"));
     }
 
+    /**
+     * Ein Name mit HTML-Sonderzeichen darf gar nicht erst gespeichert werden,
+     * sonst landet er als Stored XSS auf der Statusseite.
+     */
+    @Test
+    @WithMockUser
+    public void heartBeatShouldRejectNameWithHtmlCharacters() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "<script>alert(1)</script>"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * Zeilenumbrueche im Namen wuerden gefaelschte Logzeilen ermoeglichen.
+     */
+    @Test
+    @WithMockUser
+    public void heartBeatShouldRejectNameWithNewline() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "ok\nINFO gefaelschte Zeile"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser
+    public void heartBeatShouldRejectOverlongName() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "A".repeat(65)))
+                .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * Der zustandsaendernde Heartbeat ist ausschliesslich ueber GET erreichbar;
+     * andere Methoden werden nicht mehr stillschweigend akzeptiert.
+     */
+    @Test
+    @WithMockUser
+    public void heartBeatShouldRejectPost() throws Exception {
+        this.mockMvc.perform(post("/heartBeat").param("name", "SERVICE1"))
+                .andExpect(status().isMethodNotAllowed());
+    }
+
+    /**
+     * Die Statusseite liefert ausdruecklich text/html und darf keine
+     * unescapten Namen enthalten.
+     */
+    @Test
+    @WithMockUser
+    public void statusShouldEscapeServiceNames() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE-1"))
+                .andExpect(status().isOk());
+
+        this.mockMvc.perform(get("/status").header(HttpHeaders.ACCEPT, "text/html"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith("text/html"))
+                .andExpect(content().string(Matchers.containsString("Name: SERVICE-1")))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("<script"))));
+    }
 }

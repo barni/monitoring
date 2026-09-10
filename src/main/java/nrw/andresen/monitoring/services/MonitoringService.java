@@ -2,15 +2,17 @@ package nrw.andresen.monitoring.services;
 
 import nrw.andresen.monitoring.HeartBeat;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 
 /**
@@ -18,29 +20,68 @@ import org.slf4j.Logger;
  */
 @Component
 public class MonitoringService {
-    private class Event{
+
+    /**
+     * Erlaubte Zeichen fuer einen Servicenamen. Der Name wird geloggt, auf der
+     * Statusseite ausgegeben und in den Mail-Betreff uebernommen. Die
+     * Beschraenkung unterbindet HTML-, Log- und Header-Injection an der Quelle,
+     * statt an jeder Ausgabestelle einzeln.
+     */
+    private static final Pattern VALID_NAME = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
+
+    private static class Event {
         LocalDateTime timestamp;
         String name;
-        Boolean mailSend=false;
+        Boolean mailSend = false;
 
-        Event(String name, LocalDateTime timestamp){
+        Event(String name, LocalDateTime timestamp) {
             this.timestamp = timestamp;
             this.name = name;
         }
     }
 
-    @Autowired
-    private EmailService emailService;
-    private HashMap<String, Event> storage = new LinkedHashMap<>();
-    private Logger logger = LoggerFactory.getLogger(MonitoringService.class);
+    private final EmailService emailService;
+    private final String alertRecipient;
+    private final int maxServices;
+    private final Set<String> knownServices;
+
+    private final Map<String, Event> storage = new LinkedHashMap<>();
+    private final Logger logger = LoggerFactory.getLogger(MonitoringService.class);
+
+    public MonitoringService(EmailService emailService,
+                             @Value("${monitoring.alert-recipient}") String alertRecipient,
+                             @Value("${monitoring.max-services:100}") int maxServices,
+                             @Value("${monitoring.known-services:}") Set<String> knownServices) {
+        this.emailService = emailService;
+        this.alertRecipient = alertRecipient;
+        this.maxServices = maxServices;
+        this.knownServices = knownServices;
+    }
 
     /**
      * Heartbeat received
      *
      * @param name Name of services
      * @return Heartbeat object
+     * @throws IllegalArgumentException wenn der Name unzulaessig oder unbekannt
+     *                                  ist oder die Obergrenze erreicht wurde
      */
     public synchronized HeartBeat monitor(String name){
+        if (name == null || !VALID_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Ungueltiger Servicename");
+        }
+        // Ab hier ist der Name gegen VALID_NAME geprueft und darf geloggt werden.
+        if (!knownServices.isEmpty() && !knownServices.contains(name)) {
+            logger.warn("Heartbeat fuer unbekannten Dienst abgewiesen, name: " + name);
+            throw new IllegalArgumentException("Unbekannter Service");
+        }
+        if (!storage.containsKey(name) && storage.size() >= maxServices) {
+            // Ohne diese Grenze kann jeder Aufrufer den Speicher fluten und ueber
+            // check() beliebig viele Alarm-Mails ausloesen.
+            logger.warn("Obergrenze von " + maxServices + " Diensten erreicht, weise ab: " + name);
+            throw new IllegalArgumentException("Zu viele Dienste registriert");
+        }
+
         Event event = null;
         HeartBeat heartBeat = new HeartBeat(name);
         if ( storage.containsKey(name)){
@@ -78,7 +119,7 @@ public class MonitoringService {
                             " Dauer: " +
                             duration.toString();
 
-                    emailService.sendSimpleMessage("admin@sonderrechte.de",
+                    emailService.sendSimpleMessage(alertRecipient,
                             "Alarm! System: " + entry.getKey(),
                             msg);
                     logger.warn(msg);
@@ -91,7 +132,7 @@ public class MonitoringService {
                             " Dauer: " +
                             duration.toString();
 
-                    emailService.sendSimpleMessage("admin@sonderrechte.de",
+                    emailService.sendSimpleMessage(alertRecipient,
                             "Wieder OK! System: " + entry.getKey(),
                             msg);
                     logger.warn(msg);
@@ -108,16 +149,19 @@ public class MonitoringService {
      * @return Simple HTML String
      */
     public synchronized String getStatus(){
-        String values="";
+        StringBuilder values = new StringBuilder();
         for (Map.Entry<String, Event> entry : storage.entrySet())
         {
-            values += "Name: " + entry.getKey();
-            values += "<br/>";
-            values += "Last received: " + entry.getValue().timestamp.toString();
-            values += "<br/>";
-            values += "Duration: " + Duration.between(LocalDateTime.now(), entry.getValue().timestamp);
-            values += "<br/>";
+            // Zweite Verteidigungslinie: der Name ist bereits validiert, wird hier
+            // aber zusaetzlich escaped, damit die Seite auch dann sicher bleibt,
+            // wenn die Eingangspruefung spaeter gelockert wird.
+            values.append("Name: ").append(HtmlUtils.htmlEscape(entry.getKey()));
+            values.append("<br/>");
+            values.append("Last received: ").append(entry.getValue().timestamp.toString());
+            values.append("<br/>");
+            values.append("Duration: ").append(Duration.between(LocalDateTime.now(), entry.getValue().timestamp));
+            values.append("<br/>");
         }
-        return values;
+        return values.toString();
     }
 }
