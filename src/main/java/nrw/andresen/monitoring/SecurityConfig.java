@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
  * Die Authentifizierung erfolgt im vorgelagerten Reverse Proxy (Login + HTTPS),
@@ -28,6 +29,14 @@ public class SecurityConfig {
                 // Ohne anwendungsseitige Session gibt es kein CSRF-Schutzziel;
                 // Heartbeat-Clients sollen ohne Token posten koennen.
                 .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers
+                        // /status liefert HTML. Die Namen sind zwar validiert und
+                        // escaped, aber eine Seite, die weder Skripte noch externe
+                        // Ressourcen braucht, sollte das auch ausdruecklich sagen.
+                        .contentSecurityPolicy(csp ->
+                                csp.policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"))
+                        .referrerPolicy(referrer ->
+                                referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
                 .build();
     }
 }

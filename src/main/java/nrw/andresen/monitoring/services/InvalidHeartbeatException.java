@@ -9,6 +9,9 @@ package nrw.andresen.monitoring.services;
 public class InvalidHeartbeatException extends RuntimeException {
 
     public InvalidHeartbeatException(String message) {
-        super(message);
+        // Ohne Stacktrace: Die Ausnahme steuert nur den Statuscode und wird bei
+        // einer Flut ungueltiger Namen sehr oft erzeugt. fillInStackTrace ist
+        // der teuerste Teil davon und traegt hier nichts bei.
+        super(message, null, false, false);
     }
 }

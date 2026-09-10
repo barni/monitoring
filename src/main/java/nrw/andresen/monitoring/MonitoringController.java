@@ -1,7 +1,11 @@
 package nrw.andresen.monitoring;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.regex.Pattern;
 import nrw.andresen.monitoring.services.InvalidHeartbeatException;
 import nrw.andresen.monitoring.services.MonitoringService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,7 +20,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MonitoringController {
 
+    /**
+     * Die Adresse stammt bei gesetztem server.forward-headers-strategy mittelbar
+     * aus X-Forwarded-For. Vor dem Loggen wird sie deshalb auf das Format einer
+     * IP-Adresse geprueft, damit ueber den Header keine Logzeilen gefaelscht
+     * werden koennen.
+     */
+    private static final Pattern SAFE_ADDRESS = Pattern.compile("[0-9a-fA-F:.]{1,45}");
+
     private final MonitoringService monitoringService;
+    private final Logger logger = LoggerFactory.getLogger(MonitoringController.class);
 
     public MonitoringController(MonitoringService monitoringService) {
         this.monitoringService = monitoringService;
@@ -49,7 +62,17 @@ public class MonitoringController {
      */
     @ExceptionHandler(InvalidHeartbeatException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public String invalidRequest(InvalidHeartbeatException exception) {
+    public String invalidRequest(InvalidHeartbeatException exception, HttpServletRequest request) {
+        logger.warn("Heartbeat abgewiesen: " + exception.getMessage()
+                + ", Aufrufer: " + clientAddress(request));
         return exception.getMessage();
+    }
+
+    private static String clientAddress(HttpServletRequest request) {
+        String address = request.getRemoteAddr();
+        if (address == null || !SAFE_ADDRESS.matcher(address).matches()) {
+            return "unbekannt";
+        }
+        return address;
     }
 }

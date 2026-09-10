@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.hamcrest.Matchers;
@@ -100,6 +101,24 @@ public class MonitoringControllerTests {
     public void heartBeatShouldRejectPost() throws Exception {
         this.mockMvc.perform(post("/heartBeat").param("name", "SERVICE1"))
                 .andExpect(status().isMethodNotAllowed());
+    }
+
+    /**
+     * Die Statusseite liefert HTML und braucht weder Skripte noch externe
+     * Ressourcen; die Policy muss das ausdruecklich untersagen.
+     */
+    @Test
+    @WithMockUser
+    public void responsesShouldCarryRestrictiveSecurityHeaders() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy",
+                        Matchers.containsString("default-src 'none'")))
+                .andExpect(header().string("Content-Security-Policy",
+                        Matchers.containsString("frame-ancestors 'none'")))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
     }
 
     /**

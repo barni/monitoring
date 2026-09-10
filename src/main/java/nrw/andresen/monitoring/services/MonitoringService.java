@@ -43,6 +43,13 @@ public class MonitoringService {
         String name;
         boolean mailSend = false;
         int failedSends = 0;
+        /**
+         * Eine Benachrichtigung fuer diesen Dienst ist gerade in Zustellung.
+         * Der Versand laeuft ausserhalb des Locks; ohne diese Markierung koennte
+         * ein zweiter Scheduler-Thread dieselbe Benachrichtigung erneut
+         * einsammeln und doppelt verschicken.
+         */
+        boolean sending = false;
 
         Event(String name, LocalDateTime timestamp) {
             this.timestamp = timestamp;
@@ -113,7 +120,7 @@ public class MonitoringService {
             event = new Event(name, LocalDateTime.now());
         }
 
-        logger.info("Received Heartbeat, name: "  + event.name);
+        logger.debug("Received Heartbeat, name: "  + event.name);
         storage.put(name, event);
 
         return heartBeat;
@@ -160,6 +167,11 @@ public class MonitoringService {
             Duration duration = Duration.between(LocalDateTime.now(), event.timestamp);
             logger.debug("Check: " + event.name + " Duration: " + duration.getSeconds());
 
+            if (event.sending) {
+                // Zustellung laeuft bereits, in diesem Durchlauf ueberspringen.
+                continue;
+            }
+
             if (duration.getSeconds() < -timeoutSeconds){
                 if ( !event.mailSend ){
                     String msg = "Kein Event für " + entry.getKey() +  " seit: " +
@@ -167,6 +179,7 @@ public class MonitoringService {
                             " Dauer: " +
                             duration.toString();
 
+                    event.sending = true;
                     notifications.add(new Notification(entry.getKey(), true,
                             "Alarm! System: " + entry.getKey(), msg));
                 }
@@ -177,6 +190,7 @@ public class MonitoringService {
                             " Dauer: " +
                             duration.toString();
 
+                    event.sending = true;
                     notifications.add(new Notification(entry.getKey(), false,
                             "Wieder OK! System: " + entry.getKey(), msg));
                 }
@@ -197,6 +211,7 @@ public class MonitoringService {
         }
         event.mailSend = notification.alarm();
         event.failedSends = 0;
+        event.sending = false;
     }
 
     private synchronized void recordFailure(Notification notification){
@@ -204,6 +219,7 @@ public class MonitoringService {
         if (event == null) {
             return;
         }
+        event.sending = false;
         event.failedSends++;
         if (event.failedSends >= MAX_SEND_ATTEMPTS) {
             logger.error("Gebe Benachrichtigung fuer " + notification.name() +
