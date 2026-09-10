@@ -10,7 +10,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.2</version>
+        <version>4.1.1</version>
     </parent>
     <properties>
         <java.version>17</java.version>
@@ -45,18 +45,6 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.1</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.10.1</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
 
@@ -70,19 +58,48 @@
                     <executable>true</executable>
                 </configuration>
             </plugin>
-            <plugin>
-              <groupId>org.owasp</groupId>
-              <artifactId>dependency-check-maven</artifactId>
-	      <version>9.0.9</version>
-	      <executions>
-                  <execution>
-                      <goals>
-                          <goal>check</goal>
-                      </goals>
-                  </execution>
-              </executions>
-            </plugin>
     </plugins>
     </build>
+
+    <profiles>
+        <!--
+            OWASP dependency-check benoetigt ab Version 10 zwingend einen NVD-API-Key;
+            ohne Key bricht der Scan mit "Invalid API Key" ab und reisst den ganzen
+            Build mit. Das Profil aktiviert sich daher nur, wenn die Umgebungsvariable
+            NVD_API_KEY gesetzt ist (in der CI als Repository-Secret hinterlegt).
+            Key kostenlos anfordern: https://nvd.nist.gov/developers/request-an-api-key
+        -->
+        <profile>
+            <id>dependency-check</id>
+            <activation>
+                <property>
+                    <name>env.NVD_API_KEY</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>13.0.0</version>
+                        <configuration>
+                            <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                            <!-- Einkommentieren, damit gefundene Schwachstellen den
+                                 Build wirklich abbrechen. Der Standardwert ist 11,
+                                 d.h. der Scan meldet, schlaegt aber nie fehl. -->
+                            <!-- <failBuildOnCVSS>7</failBuildOnCVSS> -->
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

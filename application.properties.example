@@ -21,7 +21,7 @@ server.address=127.0.0.1
 
 ## Monitoring
 ## Empfaenger der Alarm-Mails.
-monitoring.alert-recipient=test@example.com
+monitoring.alert-recipient=admin@sonderrechte.de
 ## Obergrenze gleichzeitig ueberwachter Dienste. Verhindert, dass beliebig viele
 ## Namen registriert und dadurch beliebig viele Alarm-Mails ausgeloest werden.
 monitoring.max-services=100

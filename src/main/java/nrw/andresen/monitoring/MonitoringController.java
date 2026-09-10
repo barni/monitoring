@@ -1,11 +1,13 @@
 package nrw.andresen.monitoring;
 
-import java.util.concurrent.atomic.AtomicLong;
-
+import nrw.andresen.monitoring.services.InvalidHeartbeatException;
 import nrw.andresen.monitoring.services.MonitoringService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -14,8 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MonitoringController {
 
-    @Autowired
-    private MonitoringService monitoringService;
+    private final MonitoringService monitoringService;
+
+    public MonitoringController(MonitoringService monitoringService) {
+        this.monitoringService = monitoringService;
+    }
 
     /**
      * Rest service receiving an heart beat
@@ -23,7 +28,7 @@ public class MonitoringController {
      * @param name unique identifier
      * @return heatbeat object
      */
-    @RequestMapping("/heartBeat")
+    @GetMapping("/heartBeat")
     public HeartBeat heartBeat(@RequestParam(value="name") String name) {
         return monitoringService.monitor(name);
     }
@@ -32,8 +37,19 @@ public class MonitoringController {
      * Simple rest service returning the actual status of the servicess
      * @return Simple HTML string
      */
-    @RequestMapping("/status")
+    @GetMapping(value = "/status", produces = MediaType.TEXT_HTML_VALUE)
     public String status() {
         return monitoringService.getStatus();
+    }
+
+    /**
+     * Abgewiesene Heartbeats werden mit 400 beantwortet. Der eigene Ausnahmetyp
+     * stellt sicher, dass hier ausschliesslich die im Service bewusst gesetzten
+     * Meldungen nach aussen gehen und keine Eingabedaten des Aufrufers.
+     */
+    @ExceptionHandler(InvalidHeartbeatException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String invalidRequest(InvalidHeartbeatException exception) {
+        return exception.getMessage();
     }
 }

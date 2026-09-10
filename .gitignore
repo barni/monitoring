@@ -1,4 +1,5 @@
 .DS_Store
-.gitignore.swp
+*.swp
 .idea/
 target/
+/application.properties
