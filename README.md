@@ -33,9 +33,23 @@ Service names are restricted to `[A-Za-z0-9_.-]`, at most 64 characters.
 Keep the `mail.smtp.*` timeouts in place. Without them JavaMail waits forever
 and an unreachable mail server stops the alert scheduler for good.
 
-Authentication is expected to be handled by a reverse proxy in front of the
-service (login + HTTPS). The service itself binds to 127.0.0.1 only and permits
-all requests, see `SecurityConfig.java`.
+The application authenticates itself via HTTP Basic, using
+`spring.security.user.name` and `spring.security.user.password`. The reverse
+proxy in front of it only provides HTTPS; the service binds to 127.0.0.1 so the
+credentials never travel unencrypted. See `SecurityConfig.java`.
+
+Heartbeat clients have to send the credentials too, for example:
+
+```
+curl -u <user>:<password> http://localhost/heartBeat?name=SERVICE1
+```
+
+The password may be stored as plain text or, preferably, as a hash with an
+algorithm prefix:
+
+```
+spring.security.user.password={bcrypt}$2a$10$...
+```
 
 ### Building
 ```

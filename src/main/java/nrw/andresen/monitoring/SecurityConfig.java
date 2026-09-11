@@ -8,15 +8,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 /**
- * Die Authentifizierung erfolgt im vorgelagerten Reverse Proxy (Login + HTTPS),
- * der Dienst selbst lauscht nur auf 127.0.0.1. Diese Chain gibt daher alle
- * Endpunkte frei, laesst aber die Security-Filter aktiv, damit Spring Security
- * die Standard-Response-Header (u.a. X-Content-Type-Options: nosniff) setzt.
+ * Die Anwendung authentifiziert selbst, mit dem Benutzer aus
+ * spring.security.user.name und spring.security.user.password. Der vorgelagerte
+ * Reverse Proxy liefert HTTPS; der Dienst lauscht nur auf 127.0.0.1, damit die
+ * Zugangsdaten nie unverschluesselt ueber das Netz gehen.
  *
- * Bis Spring Boot 3 wurde das ueber
- * spring.autoconfigure.exclude=...SecurityAutoConfiguration geloest. Ab Boot 4
- * ist das nicht mehr moeglich, weil UserDetailsServiceAutoConfiguration eine
- * eigenstaendige Autokonfiguration ist und SecurityProperties benoetigt.
+ * HTTP Basic, weil sich die ueberwachten Dienste ohne interaktives Formular
+ * anmelden koennen muessen.
  */
 @Configuration
 @EnableWebSecurity
@@ -25,9 +23,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
-                // Ohne anwendungsseitige Session gibt es kein CSRF-Schutzziel;
-                // Heartbeat-Clients sollen ohne Token posten koennen.
+                .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
+                .httpBasic(basic -> {})
+                // CSRF-Token wuerden hier nichts schuetzen: Beide Endpunkte sind
+                // GET, und der CsrfFilter prueft ausschliesslich veraendernde
+                // Methoden. Die Heartbeat-Clients koennen zudem kein Token holen.
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers
                         // /status liefert HTML. Die Namen sind zwar validiert und

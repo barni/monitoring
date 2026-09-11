@@ -11,10 +11,19 @@ spring.mail.properties.mail.smtp.connectiontimeout=5000
 spring.mail.properties.mail.smtp.timeout=5000
 spring.mail.properties.mail.smtp.writetimeout=5000
 
-## Authentifizierung erfolgt im vorgelagerten Reverse Proxy, siehe SecurityConfig.java.
-## Der ungenutzte In-Memory-Benutzer wird abgeschaltet, damit beim Start kein
-## zufaelliges Passwort erzeugt und geloggt wird.
-spring.autoconfigure.exclude=org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+## Login. Die Anwendung authentifiziert selbst (HTTP Basic), der Reverse Proxy
+## liefert nur HTTPS. Ohne diese beiden Werte erzeugt Spring Boot beim Start ein
+## zufaelliges Passwort und schreibt es ins Log.
+##
+## Frueher stand hier zusaetzlich eine spring.autoconfigure.exclude-Zeile fuer
+## SecurityAutoConfiguration. Die hat den Login nicht eingerichtet, sondern
+## abgeschaltet: Saemtliche Endpunkte waren ohne Anmeldung erreichbar.
+##
+## Das Passwort darf als Klartext stehen oder als Hash mit Algorithmus-Praefix,
+## z.B. spring.security.user.password={bcrypt}$2a$10$... - der Hash ist
+## vorzuziehen, weil die Datei sonst das Klartextpasswort auf der Platte haelt.
+spring.security.user.name=<user>
+spring.security.user.password=<password>
 
 ## Listen only on localhost, use reverse proxy for https
 server.address=127.0.0.1

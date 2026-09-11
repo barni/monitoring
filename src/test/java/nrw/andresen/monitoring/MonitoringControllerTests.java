@@ -15,6 +15,7 @@
  */
 package nrw.andresen.monitoring;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -53,6 +54,38 @@ public class MonitoringControllerTests {
                 .webAppContextSetup(context)
                 .apply(SecurityMockMvcConfigurers.springSecurity())
                 .build();
+    }
+
+    /**
+     * Kernregression: Die Konfiguration schaltete den Login frueher versehentlich
+     * ab, alle Endpunkte waren ohne Anmeldung erreichbar. Ohne @WithMockUser darf
+     * daher nichts durchkommen.
+     */
+    @Test
+    public void endpointsMustRequireAuthentication() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1"))
+                .andExpect(status().isUnauthorized());
+        this.mockMvc.perform(get("/status"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Mit gueltigen Zugangsdaten aus application-test.properties muss der
+     * Heartbeat normal funktionieren.
+     */
+    @Test
+    public void heartBeatShouldWorkWithValidCredentials() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1")
+                        .with(httpBasic("testuser", "testpasswort")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("SERVICE1"));
+    }
+
+    @Test
+    public void wrongPasswordMustBeRejected() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1")
+                        .with(httpBasic("testuser", "falsch")))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
