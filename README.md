@@ -4,7 +4,7 @@ Monitoring service which receives rest calls. If no rest call is received for 2 
 ## Getting Started
 
 ### Prerequisites
-* Java 17 or newer (Spring Boot 4 baseline)
+* Java 25 or newer
 
 ### Configuration
 Copy `application.properties.example` to `application.properties` next to the
