@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
@@ -25,9 +26,20 @@ public class SecurityConfig {
         return http
                 .authorizeHttpRequests(requests -> requests.anyRequest().authenticated())
                 .httpBasic(basic -> {})
+                // Jede Anfrage bringt ihre Zugangsdaten selbst mit, eine Session
+                // wird nie gebraucht. Ohne diese beiden Zeilen legt Spring bei
+                // jeder 401-Antwort eine Session samt gemerkter Anfrage an, die
+                // 30 Minuten im Speicher bleibt - unangemeldete Aufrufer koennten
+                // so den Heap fuellen.
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(cache -> cache.disable())
                 // CSRF-Token wuerden hier nichts schuetzen: Beide Endpunkte sind
                 // GET, und der CsrfFilter prueft ausschliesslich veraendernde
                 // Methoden. Die Heartbeat-Clients koennen zudem kein Token holen.
+                // Gegen Heartbeats, die eine fremde Webseite im Browser eines
+                // angemeldeten Nutzers ausloest, prueft der Controller
+                // stattdessen den Header Sec-Fetch-Site.
                 .csrf(csrf -> csrf.disable())
                 .headers(headers -> headers
                         // /status liefert HTML. Die Namen sind zwar validiert und

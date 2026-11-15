@@ -170,4 +170,63 @@ public class MonitoringControllerTests {
                 .andExpect(content().string(Matchers.containsString("Name: SERVICE-1")))
                 .andExpect(content().string(Matchers.not(Matchers.containsString("<script"))));
     }
+
+    /**
+     * Abgewiesene Anfragen duerfen keine Session anlegen. Frueher merkte sich
+     * Spring bei jeder 401-Antwort die Anfrage in einer neuen Session; ohne
+     * Anmeldung liess sich so der Speicher fuellen.
+     */
+    @Test
+    public void unauthenticatedRequestMustNotCreateSession() throws Exception {
+        this.mockMvc.perform(get("/status"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(result -> org.junit.jupiter.api.Assertions.assertNull(
+                        result.getRequest().getSession(false)));
+        this.mockMvc.perform(get("/status").with(httpBasic("testuser", "falsch")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(result -> org.junit.jupiter.api.Assertions.assertNull(
+                        result.getRequest().getSession(false)));
+    }
+
+    @Test
+    public void authenticatedRequestMustNotCreateSession() throws Exception {
+        this.mockMvc.perform(get("/status").with(httpBasic("testuser", "testpasswort")))
+                .andExpect(status().isOk())
+                .andExpect(result -> org.junit.jupiter.api.Assertions.assertNull(
+                        result.getRequest().getSession(false)));
+    }
+
+    /**
+     * Eine fremde Webseite darf ueber den Browser eines angemeldeten Nutzers
+     * keinen Heartbeat ausloesen. Der Name darf danach nicht registriert sein.
+     */
+    @Test
+    @WithMockUser
+    public void heartBeatShouldRejectCrossSiteRequest() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "FREMDSEITE")
+                        .header("Sec-Fetch-Site", "cross-site"))
+                .andExpect(status().isForbidden());
+
+        this.mockMvc.perform(get("/status"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.not(Matchers.containsString("FREMDSEITE"))));
+    }
+
+    /**
+     * Clients ohne den Header (curl, Skripte) und Aufrufe von der eigenen Seite
+     * funktionieren weiter.
+     */
+    @Test
+    @WithMockUser
+    public void heartBeatShouldAcceptSameOriginAndHeaderlessRequests() throws Exception {
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1"))
+                .andExpect(status().isOk());
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1")
+                        .header("Sec-Fetch-Site", "same-origin"))
+                .andExpect(status().isOk());
+        this.mockMvc.perform(get("/heartBeat").param("name", "SERVICE1")
+                        .header("Sec-Fetch-Site", "none"))
+                .andExpect(status().isOk());
+    }
 }

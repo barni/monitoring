@@ -10,9 +10,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Main rest-controller
@@ -38,11 +40,25 @@ public class MonitoringController {
     /**
      * Rest service receiving an heart beat
      *
+     * Der Heartbeat aendert Zustand, ist aber ein GET. Ein Browser, der die
+     * Basic-Zugangsdaten fuer die Statusseite gespeichert hat, schickt sie auch
+     * mit, wenn eine fremde Webseite diese Adresse einbettet. Browser
+     * kennzeichnen solche Anfragen mit Sec-Fetch-Site: cross-site; die werden
+     * abgewiesen. Die eigentlichen Heartbeat-Clients (curl, Skripte) senden den
+     * Header nicht und sind nicht betroffen.
+     *
      * @param name unique identifier
+     * @param fetchSite vom Browser gesetzter Header Sec-Fetch-Site, sonst null
      * @return heatbeat object
      */
     @GetMapping("/heartBeat")
-    public HeartBeat heartBeat(@RequestParam(value="name") String name) {
+    public HeartBeat heartBeat(@RequestParam(value="name") String name,
+                               @RequestHeader(value="Sec-Fetch-Site", required=false) String fetchSite,
+                               HttpServletRequest request) {
+        if ("cross-site".equalsIgnoreCase(fetchSite)) {
+            logger.warn("Heartbeat von fremder Webseite abgewiesen, Aufrufer: " + clientAddress(request));
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         return monitoringService.monitor(name);
     }
 

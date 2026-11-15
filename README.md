@@ -30,6 +30,10 @@ Relevant monitoring settings:
 
 Service names are restricted to `[A-Za-z0-9_.-]`, at most 64 characters.
 
+Keep `mail.smtp.starttls.required` and `mail.smtp.ssl.checkserveridentity` set
+to `true`. Otherwise an attacker on the network path can strip STARTTLS and the
+SMTP password is sent unencrypted.
+
 Keep the `mail.smtp.*` timeouts in place. Without them JavaMail waits forever
 and an unreachable mail server stops the alert scheduler for good.
 
@@ -80,4 +84,6 @@ http://localhost/status
 Return current status of all service
 
 http://localhost/heartBeat?name=SERVICE1
-Heartbear call für SERVICE1 (GET only)
+Heartbear call für SERVICE1 (GET only). Requests a browser marks with
+`Sec-Fetch-Site: cross-site` are rejected with HTTP 403, so a foreign web page
+cannot trigger heartbeats through a logged-in browser.
